@@ -255,7 +255,9 @@
       }
 
       const src = match.sources[0];
-      const res = await fetch(`https://streamed.pk/api/stream/${src.source}/${src.id}`);
+
+      // ✅ Her bruger vi CORS-proxy
+      const res = await fetch(`https://cors-anywhere.herokuapp.com/https://streamed.pk/api/stream/${src.source}/${src.id}`);
       const streams = await res.json();
 
       streamsEl.innerHTML = `<h3>${match.title}</h3>`;
@@ -274,7 +276,6 @@
     }
 
     sportSelect.addEventListener('change', loadMatches);
-
     loadMatches();
   </script>
 </body>
