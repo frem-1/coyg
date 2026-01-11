@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sports Streams</title>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #111827;
+      color: #e5e7eb;
+    }
+
+    h2 {
+      margin-bottom: 20px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    select {
+      background: #1f2933;
+      color: #e5e7eb;
+      border: 1px solid #374151;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    select:hover {
+      border-color: #4b5563;
+    }
+
+    #searchMatch {
+      width: 100%;
+      padding: 8px 12px;
+      margin-bottom: 16px;
+      border-radius: 6px;
+      border: 1px solid #374151;
+      background: #1f2933;
+      color: #e5e7eb;
+      font-size: 14px;
+    }
+
+    .container {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .matches {
+      background: #1f2933;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .league-header {
+      margin: 16px 0 8px 0;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: #111827;
+      border-left: 4px solid #fbbf24;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .league-header:hover {
+      background: #1f2933;
+      color: #fbbf24;
+    }
+
+    .match {
+      background: #1f2933;
+      padding: 14px 16px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      border: 1px solid #374151;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      transition: all 0.2s ease;
+    }
+
+    .match:hover {
+      background: #273244;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0,0,0,0.5);
+    }
+
+    .streams {
+      background: #1f2933;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      padding: 16px;
+      min-height: 300px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .streams h3 {
+      margin-top: 0;
+      margin-bottom: 12px;
+      font-weight: 600;
+      font-size: 20px;
+    }
+
+    .hint {
+      color: #9ca3af;
+      font-size: 14px;
+      padding: 10px 0;
+    }
+
+    button {
+      background: #374151;
+      color: #e5e7eb;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 6px 6px 6px 0;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+
+    button:hover {
+      background: #4b5563;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    iframe {
+      width: 100%;
+      height: 60vh;
+      border: none;
+      border-radius: 12px;
+      margin-top: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Live Sports</h2>
+
+  <select id="sportSelect">
+    <option value="football">Football</option>
+    <option value="basketball">Basketball</option>
+    <option value="boxing">Boxing</option>
+    <option value="mma">MMA</option>
+    <option value="tennis">Tennis</option>
+  </select>
+
+  <input type="text" id="searchMatch" placeholder="Search matches..." />
+
+  <div class="container">
+    <div class="matches" id="matches"></div>
+    <div class="streams" id="streams">
+      <p class="hint">Click a match</p>
+    </div>
+  </div>
+
+  <script>
+    const matchesEl = document.getElementById('matches');
+    const streamsEl = document.getElementById('streams');
+    const sportSelect = document.getElementById('sportSelect');
+    const searchInput = document.getElementById('searchMatch');
+
+    async function loadMatches() {
+      matchesEl.innerHTML = '<p class="hint">Loading matches...</p>';
+      streamsEl.innerHTML = '<p class="hint">Click a match</p>';
+
+      const sport = sportSelect.value;
+      const res = await fetch(`https://streamed.pk/api/matches/${sport}`);
+      const matches = await res.json();
+
+      matchesEl.innerHTML = '';
+
+      // Group matches by league
+      const leagues = {};
+      matches.forEach(match => {
+        const league = match.league || 'Other';
+        if (!leagues[league]) leagues[league] = [];
+        leagues[league].push(match);
+      });
+
+      for (const league in leagues) {
+        const leagueHeader = document.createElement('h4');
+        leagueHeader.className = 'league-header';
+        leagueHeader.textContent = `▼ ${league}`;
+        matchesEl.appendChild(leagueHeader);
+
+        const leagueMatches = [];
+
+        leagues[league].forEach(match => {
+          const div = document.createElement('div');
+          div.className = 'match';
+          div.textContent = match.title;
+          div.onclick = () => loadStreams(match);
+          matchesEl.appendChild(div);
+          leagueMatches.push(div);
+        });
+
+        // Collapse/expand functionality
+        leagueHeader.onclick = () => {
+          const isCollapsed = leagueMatches[0].style.display === 'none';
+          leagueMatches.forEach(m => {
+            m.style.display = isCollapsed ? '' : 'none';
+          });
+          leagueHeader.textContent = (isCollapsed ? '▼ ' : '▶ ') + league;
+        };
+      }
+    }
+
+    searchInput.addEventListener('input', () => {
+      const searchTerm = searchInput.value.toLowerCase();
+      const allChildren = matchesEl.children;
+
+      for (let i = 0; i < allChildren.length; i++) {
+        const child = allChildren[i];
+
+        if (child.classList.contains('match')) {
+          child.style.display = child.textContent.toLowerCase().includes(searchTerm) ? '' : 'none';
+        } else if (child.classList.contains('league-header')) {
+          const nextMatches = [];
+          for (let j = i + 1; j < allChildren.length && allChildren[j].classList.contains('match'); j++) {
+            nextMatches.push(allChildren[j]);
+          }
+          const anyVisible = nextMatches.some(m => m.style.display !== 'none');
+          child.style.display = anyVisible ? '' : 'none';
+        }
+      }
+    });
+
+    async function loadStreams(match) {
+      streamsEl.innerHTML = '<p class="hint">Loading streams...</p>';
+
+      if (!match.sources || match.sources.length === 0) {
+        streamsEl.innerHTML = '<p class="hint">No streams available</p>';
+        return;
+      }
+
+      const src = match.sources[0];
+      const res = await fetch(`https://streamed.pk/api/stream/${src.source}/${src.id}`);
+      const streams = await res.json();
+
+      streamsEl.innerHTML = `<h3>${match.title}</h3>`;
+
+      streams.forEach((s, i) => {
+        const btn = document.createElement('button');
+        btn.textContent = `Stream ${i + 1}`;
+        btn.onclick = () => {
+          window.open(s.embedUrl, '_blank');
+        };
+        streamsEl.appendChild(btn);
+      });
+
+      const iframe = document.createElement('iframe');
+      streamsEl.appendChild(iframe);
+    }
+
+    sportSelect.addEventListener('change', loadMatches);
+
+    loadMatches();
+  </script>
+</body>
+</html>
