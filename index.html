@@ -9,42 +9,25 @@
     body {
       margin: 0;
       padding: 20px;
-      font-family: 'Segoe UI', Arial, sans-serif;
+      font-family: Arial, sans-serif;
       background: #111827;
       color: #e5e7eb;
     }
 
     h2 {
-      margin-bottom: 20px;
-      font-weight: 600;
       text-align: center;
+      margin-bottom: 20px;
     }
 
-    select {
-      background: #1f2933;
-      color: #e5e7eb;
-      border: 1px solid #374151;
-      padding: 10px 14px;
-      border-radius: 8px;
-      margin-bottom: 16px;
-      font-size: 16px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    select:hover {
-      border-color: #4b5563;
-    }
-
-    #searchMatch {
+    select, input {
       width: 100%;
-      padding: 8px 12px;
-      margin-bottom: 16px;
-      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      border-radius: 8px;
       border: 1px solid #374151;
       background: #1f2933;
       color: #e5e7eb;
-      font-size: 14px;
+      font-size: 16px;
     }
 
     .container {
@@ -65,42 +48,44 @@
       border-radius: 12px;
       max-height: 80vh;
       overflow-y: auto;
-      padding: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      padding: 10px;
     }
 
-    .league-header {
-      margin: 16px 0 8px 0;
-      font-weight: 600;
-      cursor: pointer;
-      user-select: none;
-      padding: 6px 10px;
-      border-radius: 6px;
-      background: #111827;
-      border-left: 4px solid #fbbf24;
-      transition: background 0.2s ease, color 0.2s ease;
+    .league {
+      margin-bottom: 18px;
     }
 
-    .league-header:hover {
-      background: #1f2933;
-      color: #fbbf24;
+    .league h3 {
+      margin: 10px 0;
+      font-size: 16px;
+      color: #93c5fd;
+      border-bottom: 1px solid #374151;
+      padding-bottom: 4px;
     }
 
     .match {
-      background: #1f2933;
-      padding: 14px 16px;
+      padding: 12px;
       border-radius: 10px;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       cursor: pointer;
       border: 1px solid #374151;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-      transition: all 0.2s ease;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: 0.2s;
     }
 
     .match:hover {
       background: #273244;
-      transform: translateY(-2px);
-      box-shadow: 0 6px 12px rgba(0,0,0,0.5);
+    }
+
+    .live {
+      background: #7f1d1d;
+      color: #fecaca;
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-weight: bold;
     }
 
     .streams {
@@ -109,20 +94,6 @@
       border-radius: 12px;
       padding: 16px;
       min-height: 300px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    }
-
-    .streams h3 {
-      margin-top: 0;
-      margin-bottom: 12px;
-      font-weight: 600;
-      font-size: 20px;
-    }
-
-    .hint {
-      color: #9ca3af;
-      font-size: 14px;
-      padding: 10px 0;
     }
 
     button {
@@ -133,23 +104,15 @@
       border-radius: 8px;
       cursor: pointer;
       margin: 6px 6px 6px 0;
-      font-size: 14px;
-      transition: all 0.2s ease;
     }
 
     button:hover {
       background: #4b5563;
-      transform: translateY(-1px);
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
 
-    iframe {
-      width: 100%;
-      height: 60vh;
-      border: none;
-      border-radius: 12px;
-      margin-top: 12px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    .hint {
+      color: #9ca3af;
+      font-size: 14px;
     }
   </style>
 </head>
@@ -165,7 +128,7 @@
     <option value="tennis">Tennis</option>
   </select>
 
-  <input type="text" id="searchMatch" placeholder="Search matches..." />
+  <input id="searchInput" placeholder="Search matches..." />
 
   <div class="container">
     <div class="matches" id="matches"></div>
@@ -175,76 +138,85 @@
   </div>
 
   <script>
-    const matchesEl = document.getElementById('matches');
-    const streamsEl = document.getElementById('streams');
-    const sportSelect = document.getElementById('sportSelect');
-    const searchInput = document.getElementById('searchMatch');
+    const PROXY_URL = "https://coyg.onrender.com";
+
+    const matchesEl = document.getElementById("matches");
+    const streamsEl = document.getElementById("streams");
+    const sportSelect = document.getElementById("sportSelect");
+    const searchInput = document.getElementById("searchInput");
+
+    let allMatches = [];
+
+    function getLeague(title) {
+      if (title.toLowerCase().includes("premier")) return "Premier League";
+      if (title.toLowerCase().includes("la liga")) return "La Liga";
+      if (title.toLowerCase().includes("serie")) return "Serie A";
+      if (title.toLowerCase().includes("nba")) return "NBA";
+      if (title.toLowerCase().includes("ufc")) return "UFC";
+      return "Other";
+    }
+
+    function isLive(title) {
+      return title.toLowerCase().includes("live") || title.includes("vs");
+    }
 
     async function loadMatches() {
       matchesEl.innerHTML = '<p class="hint">Loading matches...</p>';
       streamsEl.innerHTML = '<p class="hint">Click a match</p>';
 
-      const sport = sportSelect.value;
-      const res = await fetch(`https://streamed.pk/api/matches/${sport}`);
-      const matches = await res.json();
+      const res = await fetch(`${PROXY_URL}/api/matches/${sportSelect.value}`);
+      allMatches = await res.json();
 
-      matchesEl.innerHTML = '';
+      renderMatches();
+    }
 
-      // Group matches by league
+    function renderMatches() {
+      matchesEl.innerHTML = "";
+
+      const search = searchInput.value.toLowerCase();
+      const filtered = allMatches.filter(m =>
+        m.title.toLowerCase().includes(search)
+      );
+
       const leagues = {};
-      matches.forEach(match => {
-        const league = match.league || 'Other';
+
+      filtered.forEach(match => {
+        const league = getLeague(match.title);
         if (!leagues[league]) leagues[league] = [];
         leagues[league].push(match);
       });
 
-      for (const league in leagues) {
-        const leagueHeader = document.createElement('h4');
-        leagueHeader.className = 'league-header';
-        leagueHeader.textContent = `▼ ${league}`;
-        matchesEl.appendChild(leagueHeader);
+      Object.keys(leagues).forEach(league => {
+        const leagueDiv = document.createElement("div");
+        leagueDiv.className = "league";
 
-        const leagueMatches = [];
+        const h3 = document.createElement("h3");
+        h3.textContent = league;
+        leagueDiv.appendChild(h3);
 
         leagues[league].forEach(match => {
-          const div = document.createElement('div');
-          div.className = 'match';
-          div.textContent = match.title;
+          const div = document.createElement("div");
+          div.className = "match";
+
+          const title = document.createElement("span");
+          title.textContent = match.title;
+
+          div.appendChild(title);
+
+          if (isLive(match.title)) {
+            const live = document.createElement("span");
+            live.className = "live";
+            live.textContent = "LIVE";
+            div.appendChild(live);
+          }
+
           div.onclick = () => loadStreams(match);
-          matchesEl.appendChild(div);
-          leagueMatches.push(div);
+          leagueDiv.appendChild(div);
         });
 
-        // Collapse/expand functionality
-        leagueHeader.onclick = () => {
-          const isCollapsed = leagueMatches[0].style.display === 'none';
-          leagueMatches.forEach(m => {
-            m.style.display = isCollapsed ? '' : 'none';
-          });
-          leagueHeader.textContent = (isCollapsed ? '▼ ' : '▶ ') + league;
-        };
-      }
+        matchesEl.appendChild(leagueDiv);
+      });
     }
-
-    searchInput.addEventListener('input', () => {
-      const searchTerm = searchInput.value.toLowerCase();
-      const allChildren = matchesEl.children;
-
-      for (let i = 0; i < allChildren.length; i++) {
-        const child = allChildren[i];
-
-        if (child.classList.contains('match')) {
-          child.style.display = child.textContent.toLowerCase().includes(searchTerm) ? '' : 'none';
-        } else if (child.classList.contains('league-header')) {
-          const nextMatches = [];
-          for (let j = i + 1; j < allChildren.length && allChildren[j].classList.contains('match'); j++) {
-            nextMatches.push(allChildren[j]);
-          }
-          const anyVisible = nextMatches.some(m => m.style.display !== 'none');
-          child.style.display = anyVisible ? '' : 'none';
-        }
-      }
-    });
 
     async function loadStreams(match) {
       streamsEl.innerHTML = '<p class="hint">Loading streams...</p>';
@@ -255,27 +227,22 @@
       }
 
       const src = match.sources[0];
-
-      // ✅ Her bruger vi CORS-proxy
-      const res = await fetch(`https://cors-anywhere.herokuapp.com/https://streamed.pk/api/stream/${src.source}/${src.id}`);
+      const res = await fetch(`${PROXY_URL}/api/stream/${src.source}/${src.id}`);
       const streams = await res.json();
 
       streamsEl.innerHTML = `<h3>${match.title}</h3>`;
 
       streams.forEach((s, i) => {
-        const btn = document.createElement('button');
+        const btn = document.createElement("button");
         btn.textContent = `Stream ${i + 1}`;
-        btn.onclick = () => {
-          window.open(s.embedUrl, '_blank');
-        };
+        btn.onclick = () => window.open(s.embedUrl, "_blank");
         streamsEl.appendChild(btn);
       });
-
-      const iframe = document.createElement('iframe');
-      streamsEl.appendChild(iframe);
     }
 
-    sportSelect.addEventListener('change', loadMatches);
+    sportSelect.addEventListener("change", loadMatches);
+    searchInput.addEventListener("input", renderMatches);
+
     loadMatches();
   </script>
 </body>
